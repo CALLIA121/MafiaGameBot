@@ -6,7 +6,7 @@ from config import fprint, debug
 DBlist = {1: 'Users', 2: 'Rols', 3: 'Games'}
 
 
-def connectTo(file_path:str) -> bool:
+def connectTo(file_path: str) -> bool:
     """
     Подключается к базе данных.
     :param file_path: путь к базе
@@ -24,14 +24,13 @@ def connectTo(file_path:str) -> bool:
         return True
     except Exception:
         return False
-    
 
 
 def writeData(DB: int,
               st: str,
               value,
               qvest=None
-    ) -> None:
+              ) -> None:
     '''
     Запись данных в базу.
     :param st: столбец для записи.
@@ -43,13 +42,11 @@ def writeData(DB: int,
     if debug:
         print(f"Write {value} into {DBlist[DB]} {st} WHERE {qvest}")
 
-   
-
     if qvest is None:
         cursor.execute(
             f'INSERT INTO `{DBlist[DB]}` ({st}) VALUES (?)', (value,))
         return None
-    
+
     isID = True
     if isinstance(qvest, str):
         if qvest[0] == "!":
@@ -93,7 +90,8 @@ def getData(DB: int,
     :param DB: {1: 'Users', 2: 'Rols', 3: 'Games'}.
     :param qvest: условия для чтения, при передаче числа будет распознано как id, иначе пишите !<Sq3 условие>.
     '''
-    
+    global debug
+
     DB = DBlist[DB]
 
     isID = True
@@ -103,7 +101,8 @@ def getData(DB: int,
 
     if isID:
         qvest = int(qvest)
-        print(f'''SELECT {st} FROM `{DB}` WHERE `ID` = {qvest}''')
+        if debug:
+            print(f'''SELECT {st} FROM `{DB}` WHERE `ID` = {qvest}''')
         cursor.execute(f'''SELECT {st} FROM `{DB}` WHERE `ID` = {qvest}''')
         result = cursor.fetchall()
         if result is None:

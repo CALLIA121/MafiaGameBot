@@ -3,6 +3,8 @@ import json
 # --------------------------- Настройки ---------------------------
 TOKEN = '7547376848:AAHa9ThwqibdqRiJoUj6oda6SxxEkwxoPcM'
 debug = True
+MAX_PLAYERS = 10
+MIN_PLAYERS = 4
 
 
 # ----------------- Переменные и функции системы ------------------
@@ -12,6 +14,7 @@ DB_PATH = f'{PATH_ME}bot.db'
 Chars_lson = f'{PATH_ME}chars.json'
 with open(Chars_lson, 'r') as f:
     chars = dict(json.load(f))
+
 
 def banner(text: str) -> str:
     '''
