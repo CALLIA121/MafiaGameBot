@@ -8,7 +8,7 @@ import db
 from config import fprint, MAX_PLAYERS
 
 # ------------------------ Инициализация бота -----------------------
-API_TOKEN = 'YOUR_BOT_TOKEN'
+API_TOKEN = '7547376848:AAHa9ThwqibdqRiJoUj6oda6SxxEkwxoPcM'
 bot = Bot(token=API_TOKEN)
 dp = Dispatcher(bot)
 
