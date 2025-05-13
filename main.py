@@ -9,6 +9,7 @@ from aiogram.utils import executor
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 import db
 from config import fprint, MAX_PLAYERS
+from db import *
 
 # ------------------------ Инициализация бота -----------------------
 API_TOKEN = '7547376848:AAHa9ThwqibdqRiJoUj6oda6SxxEkwxoPcM'
@@ -123,9 +124,9 @@ async def cmd_start_game(message: types.Message):
 
     markup = InlineKeyboardMarkup(row_width=2)
     markup.add(
-        InlineKeyboardButton("🎮 Присоединиться",
-                             callback_data=f"join_{chat_id}"),
-        InlineKeyboardButton("🚀 Начать игру", callback_data=f"start_{chat_id}")
+        InlineKeyboardButton("🎮 Присоединиться", callback_data=f"join_{chat_id}"),
+        InlineKeyboardButton("🚀 Начать игру", callback_data=f"start_{chat_id}"),
+        InlineKeyboardButton("❌ Завершить игру", callback_data=f"end_{chat_id}")
     )
 
     players = db.getData(1, 'Nickname', f"!inGame = {chat_id} AND Alive = 1")
@@ -366,10 +367,12 @@ async def check_win_condition(chat_id):
 
 
 async def end_game(chat_id):
-    db.writeData(3, 'Night, AtNight',
-                 (1, '{"killed":-1,"healed":-1}'), f"!ChatID = {chat_id}")
+    db.writeData(3, 'Night, AtNight, MessageID',
+                 (1, '{"killed":-1,"healed":-1}', -1), f"!ChatID = {chat_id}")
     db.writeData(1, 'inGame, Alive, role', (-1, 0, -1), f"!inGame = {chat_id}")
+    await send_to_group(chat_id, "🏁 Игра была завершена создателем. До новых встреч!")
 
 
 if __name__ == '__main__':
     executor.start_polling(dp, skip_updates=True)
+    DeleteData(3)
