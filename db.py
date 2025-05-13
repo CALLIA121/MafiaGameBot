@@ -38,13 +38,16 @@ def writeData(DB: int,
     :param qvest: условия для записи, при передаче числа будет распознано как id, иначе пишите !<Sq3 условие>.
     :param value: данные для записи.
     '''
+    global connect
+    global cursor
     global debug
-    if debug:
-        print(f"Write {value} into {DBlist[DB]} {st} WHERE {qvest}")
 
     if qvest is None:
+        if debug:
+            print(f'INSERT INTO {DBlist[DB]} ({st}) VALUES {value}')
         cursor.execute(
-            f'INSERT INTO `{DBlist[DB]}` ({st}) VALUES (?)', (value,))
+            f'INSERT INTO {DBlist[DB]} ({st}) VALUES {value}')
+        connect.commit()
         return None
 
     isID = True
@@ -63,22 +66,22 @@ def writeData(DB: int,
         if result is None:
             if debug:
                 print(
-                    f'INSERT INTO `{DBlist[DB]}` ({st}, ) VALUES (?, )', (value, ))
+                    f'INSERT INTO `{DBlist[DB]}` ({st}, ) VALUES {value}')
             cursor.execute(
-                f'INSERT INTO `{DBlist[DB]}` ({st}) VALUES (?)', (value, ))
+                f'INSERT INTO `{DBlist[DB]}` ({st}) VALUES {value}')
         else:
             cursor.execute(
-                f'''UPDATE `{DBlist[DB]}` SET `{st}` = ? WHERE `ID` = ?''', (value, qvest))
+                f'''UPDATE `{DBlist[DB]}` SET ({st}) = ({value}) WHERE `ID` = {qvest}''')
     else:
         qvest = qvest[1:]
         cursor.execute(f'''SELECT `{st}` FROM `{DBlist[DB]}` WHERE {qvest}''')
         result = cursor.fetchone()
         if result is None:
             cursor.execute(
-                f'INSERT INTO `{DBlist[DB]}` ({st}) VALUES (?)', (value, ))
+                f'INSERT INTO `{DBlist[DB]}` ({st}) VALUES {value}')
         else:
             cursor.execute(
-                f'''UPDATE `{DBlist[DB]}` SET `{st}` = ? WHERE  {qvest}''', (value, ))
+                f'''UPDATE `{DBlist[DB]}` SET `{st}` = {value} WHERE {qvest}''')
     connect.commit()
 
 
@@ -90,6 +93,8 @@ def getData(DB: int,
     :param DB: {1: 'Users', 2: 'Rols', 3: 'Games'}.
     :param qvest: условия для чтения, при передаче числа будет распознано как id, иначе пишите !<Sq3 условие>.
     '''
+    global connect
+    global cursor
     global debug
 
     DB = DBlist[DB]

@@ -2,6 +2,9 @@ import json
 import random
 import asyncio
 from aiogram import Bot, Dispatcher, types
+from aiogram.contrib.fsm_storage.memory import MemoryStorage
+from aiogram.dispatcher import FSMContext
+from aiogram.dispatcher.filters.state import State, StatesGroup
 from aiogram.utils import executor
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 import db
@@ -10,20 +13,30 @@ from config import fprint, MAX_PLAYERS
 # ------------------------ Инициализация бота -----------------------
 API_TOKEN = '7547376848:AAHa9ThwqibdqRiJoUj6oda6SxxEkwxoPcM'
 bot = Bot(token=API_TOKEN)
-dp = Dispatcher(bot)
+storage = MemoryStorage()
+dp = Dispatcher(bot, storage=storage)
+
+db.connectTo('bot.db')
+
+# ------------------------ Состояния регистрации --------------------
+
+
+class Registration(StatesGroup):
+    nickname = State()
+
 
 # ------------------------ Константы и утилиты -----------------------
 PHASE_TIMEOUTS = {'night': 60, 'day': 120}
 ROLES = {
-    1: {'title': 'Мирный житель', 'emoji': '👨🌾', 'color': '#27ae60'},
-    2: {'title': 'Мафия', 'emoji': '🔫', 'color': '#c0392b'},
-    3: {'title': 'Доктор', 'emoji': '🩺', 'color': '#2980b9'},
-    4: {'title': 'Комиссар', 'emoji': '🕵️', 'color': '#8e44ad'}
+    1: {'title': 'Мирный житель', 'emoji': '👨🌾', 'color': '#27ae60', 'about': 'Ваша цель - выжить и выявить всех членов мафии путем голосования.'},
+    2: {'title': 'Мафия', 'emoji': '🔫', 'color': '#c0392b', 'about': 'Ночью вы устраняете мирных жителей, днем стараетесь не попасться.'},
+    3: {'title': 'Доктор', 'emoji': '🩺', 'color': '#2980b9', 'about': 'Каждую ночь вы можете выбрать одного игрока для лечения.'},
+    4: {'title': 'Комиссар', 'emoji': '🕵️', 'color': '#8e44ad', 'about': 'Ночью вы можете проверить роль одного игрока.'}
 }
 
 
 async def send_to_group(chat_id, text):
-    await bot.send_message(chat_id, f"👮♂️ Ведущий: {text}")
+    await bot.send_message(chat_id, f"👮 Ведущий: {text}")
 
 
 async def get_game_data(chat_id):
@@ -41,6 +54,48 @@ async def update_game_data(chat_id, data):
 # ------------------------ Обработчики команд ------------------------
 
 
+@dp.message_handler(commands=['start'], chat_type=types.ChatType.PRIVATE)
+async def cmd_start_private(message: types.Message):
+    user_id = message.from_user.id
+    if db.getData(1, 'ID', user_id):
+        await message.answer("✅ Вы уже зарегистрированы!")
+        return
+
+    await message.answer("📝 Введите ваш игровой никнейм (3-20 символов, только буквы и цифры):")
+    await Registration.nickname.set()
+
+
+@dp.message_handler(commands=['start'], chat_type=[types.ChatType.GROUP, types.ChatType.SUPERGROUP])
+async def cmd_start_group(message: types.Message):
+    user_id = message.from_user.id
+    if not db.getData(1, 'ID', user_id):
+        await message.reply("⚠️ Для участия в игре нужно зарегистрироваться!\nПерейдите в личные сообщения с ботом и напишите /start")
+
+
+@dp.message_handler(state=Registration.nickname)
+async def process_nickname(message: types.Message, state: FSMContext):
+    nickname = message.text.strip()
+
+    if not (3 <= len(nickname) <= 20):
+        await message.answer("❌ Никнейм должен быть от 3 до 20 символов!")
+        return
+
+    if not nickname.isalnum():
+        await message.answer("❌ Можно использовать только буквы и цифры!")
+        return
+
+    if db.getData(1, 'ID', f"!Nickname = '{nickname}'"):
+        await message.answer("❌ Этот никнейм уже занят!")
+        return
+
+    user_id = message.from_user.id
+    db.writeData(1, 'ID, Nickname, inGame, Alive, role',
+                 (user_id, nickname, -1, 0, -1), qvest=None)
+
+    await message.answer(f"🎉 Регистрация завершена, {nickname}!\nТеперь вы можете участвовать в играх!")
+    await state.finish()
+
+
 @dp.message_handler(commands=['startgame'])
 async def cmd_start_game(message: types.Message):
     chat_id = message.chat.id
@@ -50,11 +105,14 @@ async def cmd_start_game(message: types.Message):
         return
 
     creator_id = message.from_user.id
-    db.writeData(3, 'ChatID, Night, AtNight, MessageID',
-                 (chat_id, 1, '{"killed":-1,"healed":-1}', -1), qvest=None)
+    if not db.getData(1, 'ID', creator_id):
+        await message.reply("❌ Сначала зарегистрируйтесь через /start в ЛС!")
+        return
 
-    db.writeData(1, 'inGame, Alive, role',
-                 (chat_id, 1, -1), f"!ID = {creator_id}")
+    db.writeData(3, 'ChatID, Night, AtNight, MessageID',
+                 (chat_id, 1, '{"killed":-1,"healed":-1}', -1))
+
+    db.writeData(1, 'inGame, Alive, role', (chat_id, 1, -1), creator_id)
 
     markup = InlineKeyboardMarkup(row_width=2)
     markup.add(
@@ -64,7 +122,7 @@ async def cmd_start_game(message: types.Message):
     )
 
     players = db.getData(1, 'Nickname', f"!inGame = {chat_id} AND Alive = 1")
-    players_list = "\n".join([f"👉 {name[0]}" for name in players])
+    players_list = "\n".join([f"👉 {name}" for name in players])
 
     msg = await bot.send_message(
         chat_id,
@@ -75,37 +133,7 @@ async def cmd_start_game(message: types.Message):
         reply_markup=markup
     )
 
-    db.writeData(3, 'MessageID', msg.message_id, f"!ChatID = {chat_id}")
-
-
-async def update_game_lobby(chat_id):
-    players = db.getData(1, 'Nickname', f"!inGame = {chat_id} AND Alive = 1")
-    game_data = await get_game_data(chat_id)
-
-    players_list = "\n".join([f"👉 {name[0]}" for name in players])
-    new_text = (
-        f"🎉 Начинаем новую игру в Мафию!\n"
-        f"👥 Игроков: {len(players)}/{MAX_PLAYERS}\n"
-        f"➖➖➖➖➖➖➖➖➖➖\n"
-        f"Участники:\n{players_list}"
-    )
-
-    markup = InlineKeyboardMarkup(row_width=2)
-    markup.add(
-        InlineKeyboardButton("🎮 Присоединиться",
-                             callback_data=f"join_{chat_id}"),
-        InlineKeyboardButton("🚀 Начать игру", callback_data=f"start_{chat_id}")
-    )
-
-    try:
-        await bot.edit_message_text(
-            chat_id=chat_id,
-            message_id=game_data['message_id'],
-            text=new_text,
-            reply_markup=markup
-        )
-    except Exception as e:
-        fprint(f"Ошибка обновления лобби: {e}")
+    db.writeData(3, 'MessageID', msg.message_id, f"!ChatID = {chat_id}")    
 
 # ------------------------ Callback обработчики ----------------------
 
@@ -115,33 +143,56 @@ async def process_join(callback: CallbackQuery):
     chat_id = int(callback.data.split('_')[1])
     user_id = callback.from_user.id
 
+    if db.getData(1, 'ID', user_id) == []:
+        await callback.answer("❌ Сначала зарегистрируйтесь через /start в ЛС!")
+        return
+
     current_players = db.getData(1, 'ID', f"!inGame = {chat_id} AND Alive = 1")
     if len(current_players) >= MAX_PLAYERS:
         await callback.answer("❌ Достигнут максимум игроков!")
         return
 
-    current_game = db.getData(1, 'inGame', user_id)[0]
-    if current_game != -1 and current_game != chat_id:
+    current_game = db.getData(1, 'inGame', user_id)
+    if current_game != [-1] and current_game != [chat_id]:
         await callback.answer("❌ Вы уже в другой игре!")
         return
 
-    if not db.getData(1, 'ID', user_id):
-        db.writeData(1, 'ID, Nickname, inGame, Alive, role',
-                     (user_id, callback.from_user.full_name, chat_id, 1, -1), qvest=None)
-    else:
-        db.writeData(1, 'inGame, Alive, role',
-                     (chat_id, 1, -1), f"!ID = {user_id}")
+    
+    
+    db.writeData(1, 'inGame, Alive, role',
+                    (chat_id, 1, -1), user_id)
 
     await callback.answer("✅ Вы успешно присоединились!")
     await update_game_lobby(chat_id)
 
+async def update_game_lobby(chat_id):
+    players = db.getData(1, 'Nickname', f"!inGame = {chat_id} AND Alive = 1")
+    players_list = "\n".join([f"👉 {name}" for name in players])
+    msg = db.getData(3, 'MessageID', f"!ChatID = {chat_id}")[0]
+
+    markup = InlineKeyboardMarkup(row_width=2)
+    markup.add(
+        InlineKeyboardButton("🎮 Присоединиться",
+                             callback_data=f"join_{chat_id}"),
+        InlineKeyboardButton("🚀 Начать игру", callback_data=f"start_{chat_id}")
+    )
+
+    await bot.edit_message_text(
+        text = f"🎉 Начинаем новую игру в Мафию!\n"
+        f"👥 Игроков: {len(players)}/{MAX_PLAYERS}\n" 
+        f"➖➖➖➖➖➖➖➖➖➖\n"
+        f"Участники:\n{players_list}",
+        reply_markup=markup,
+        chat_id=chat_id,
+        message_id=msg
+    )
 
 @dp.callback_query_handler(lambda c: c.data.startswith('start_'))
 async def process_start(callback: CallbackQuery):
     chat_id = int(callback.data.split('_')[1])
     user_id = callback.from_user.id
 
-    creator = db.getData(1, 'ID', f"!inGame = {chat_id} AND Alive = 1")[0][0]
+    creator = db.getData(3, 'CreatorID', f"ChatID = chat_id")[0]
     if user_id != creator:
         await callback.answer("❌ Только создатель игры может её начать!")
         return
