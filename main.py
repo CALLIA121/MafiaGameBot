@@ -8,6 +8,7 @@ from aiogram.dispatcher.filters.state import State, StatesGroup
 from aiogram.utils import executor
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 import db
+import aiogram.utils.exceptions as aigramExceptions
 from config import fprint, MAX_PLAYERS
 
 # ------------------------ Инициализация бота -----------------------
@@ -100,17 +101,17 @@ async def process_nickname(message: types.Message, state: FSMContext):
 async def cmd_start_game(message: types.Message):
     chat_id = message.chat.id
 
-    if db.getData(3, 'ChatID', f"!ChatID = {chat_id}"):
-        await send_to_group(chat_id, "❌ В этом чате уже есть активная игра!")
+    if db.getData(3, 'ChatID', f"!ChatID = {chat_id}") != []:
+        await send_to_group(chat_id, "❌ В этом чате уже есть активная игра!\nЕё можно завершить и начать новый набор используйте /endgame")
         return
 
     creator_id = message.from_user.id
-    if not db.getData(1, 'ID', creator_id):
+    if db.getData(1, 'ID', creator_id) == []:
         await message.reply("❌ Сначала зарегистрируйтесь через /start в ЛС!")
         return
 
-    db.writeData(3, 'ChatID, Night, AtNight, MessageID',
-                 (chat_id, 1, '{"killed":-1,"healed":-1}', -1))
+    db.writeData(3, 'ChatID, Night, AtNight, MessageID, CreatorID',
+                 (chat_id, 1, '{"killed":-1,"healed":-1}', -1, creator_id))
 
     db.writeData(1, 'inGame, Alive, role', (chat_id, 1, -1), creator_id)
 
@@ -133,7 +134,25 @@ async def cmd_start_game(message: types.Message):
         reply_markup=markup
     )
 
-    db.writeData(3, 'MessageID', msg.message_id, f"!ChatID = {chat_id}")    
+    db.writeData(3, 'MessageID', msg.message_id, f"!ChatID = {chat_id}")
+
+
+@dp.message_handler(commands=['endgame'])
+async def cmd_end_game(message: types.Message):
+    chat_id = message.chat.id
+    msg_id = db.getData(3, 'MessageID', f"!ChatID = {chat_id}")
+    fprint('INFO: Try end game in ', end='')
+    fprint(chat_id, type='T2')
+    if msg_id == []:
+        await send_to_group(chat_id, "❌ В этом чате не запущена игра!\nЕё можно начать используя /startgame")
+        return
+    try:
+        await bot.delete_message(chat_id, msg_id[0])
+    except aigramExceptions.MessageCantBeDeleted:
+        fprint('INFO: message can`t be deleted.', end='')
+    await end_game(chat_id)
+    await send_to_group(chat_id, "✅ Предыдущая игра завершена. Можно начать новую, используя /startgame")
+
 
 # ------------------------ Callback обработчики ----------------------
 
@@ -157,13 +176,12 @@ async def process_join(callback: CallbackQuery):
         await callback.answer("❌ Вы уже в другой игре!")
         return
 
-    
-    
-    db.writeData(1, 'inGame, Alive, role',
-                    (chat_id, 1, -1), user_id)
+    db.writeData(1, 'inGame, Alive, role, Checked',
+                    (chat_id, 1, -1, 0), user_id)
 
     await callback.answer("✅ Вы успешно присоединились!")
     await update_game_lobby(chat_id)
+
 
 async def update_game_lobby(chat_id):
     players = db.getData(1, 'Nickname', f"!inGame = {chat_id} AND Alive = 1")
@@ -178,8 +196,8 @@ async def update_game_lobby(chat_id):
     )
 
     await bot.edit_message_text(
-        text = f"🎉 Начинаем новую игру в Мафию!\n"
-        f"👥 Игроков: {len(players)}/{MAX_PLAYERS}\n" 
+        text=f"🎉 Начинаем новую игру в Мафию!\n"
+        f"👥 Игроков: {len(players)}/{MAX_PLAYERS}\n"
         f"➖➖➖➖➖➖➖➖➖➖\n"
         f"Участники:\n{players_list}",
         reply_markup=markup,
@@ -187,12 +205,13 @@ async def update_game_lobby(chat_id):
         message_id=msg
     )
 
+
 @dp.callback_query_handler(lambda c: c.data.startswith('start_'))
 async def process_start(callback: CallbackQuery):
     chat_id = int(callback.data.split('_')[1])
     user_id = callback.from_user.id
 
-    creator = db.getData(3, 'CreatorID', f"ChatID = chat_id")[0]
+    creator = db.getData(3, 'CreatorID', f"!ChatID = {chat_id}")[0]
     if user_id != creator:
         await callback.answer("❌ Только создатель игры может её начать!")
         return
@@ -232,7 +251,7 @@ async def start_game_logic(chat_id):
                 player_id,
                 f"🎭 Ваша роль: {role_info['emoji']} {role_info['title']}\n"
                 f"➖➖➖➖➖➖➖➖➖➖\n"
-                f"{db.getData(2, 'About', role_id)[0]}"
+                f"{db.getData(2, '`About`', role_id)[0]}"
             )
             if role_id == 2:
                 await send_mafia_actions(player_id, chat_id)
@@ -247,30 +266,69 @@ async def start_game_logic(chat_id):
 
 async def send_mafia_actions(user_id, chat_id):
     players = db.getData(
-        1, 'ID', f"!inGame = {chat_id} AND Alive = 1 AND role != 2")
+        1, '(`ID`, `Nickname`)', f"!inGame = {chat_id} AND Alive = 1 AND role != 2")
     markup = InlineKeyboardMarkup()
-    for player in players:
+    for ID, Nickname in players:
         markup.add(InlineKeyboardButton(
-            f"👤 {db.getData(1, 'Nickname', player)[0]}",
-            callback_data=f"kill_{player}"
+            f"👤 {Nickname}",
+            callback_data=f"kill_{ID}"
         ))
     await bot.send_message(user_id, "🔫 Выберите жертву:", reply_markup=markup)
 
 
 async def send_doctor_actions(user_id, chat_id):
-    players = db.getData(1, 'ID', f"!inGame = {chat_id} AND Alive = 1")
+    players = db.getData(1, '(`ID`, `Nickname`)',
+                         f"!inGame = {chat_id} AND Alive = 1")
     markup = InlineKeyboardMarkup()
-    for player in players:
+    for ID, Nickname in players:
         markup.add(InlineKeyboardButton(
-            f"👤 {db.getData(1, 'Nickname', player)[0]}",
-            callback_data=f"heal_{player}"
+            f"👤 {Nickname}",
+            callback_data=f"heal_{ID}"
         ))
     await bot.send_message(user_id, "🩺 Выберите кого вылечить:", reply_markup=markup)
 
 
+async def send_sherif_actions(user_id, chat_id):
+    players = db.getData(1, '(`ID`, `Nickname`, `Role`, `Checked`)',
+                         f"!inGame = {chat_id} AND Alive = 1")
+    markup = InlineKeyboardMarkup()
+    ch = {
+        0: '😶‍🌫️',
+        1: '👤',
+        2: '🔫',
+        3: '🩺',
+    }
+    for ID, Nickname, Role, Checked in players:
+        markup.add(InlineKeyboardButton(
+            f"{ch[Role] if Checked else ch[0]} {Nickname}",
+            callback_data=f"check_{ID}"
+        ))
+    await bot.send_message(user_id, "🔍 Выберите, чью роль хотите узнать! Эмодзи перед именем означает: 😶‍🌫️ - неизвестный, \n🔫 - мафия, \n🩺 - доктор, \n👤 - мирный", reply_markup=markup)
+
+
+async def check_game(chat_id):
+    return db.getData(3, 'ID', f"!ChatId = {chat_id}") != []
+
+
 async def night_phase(chat_id):
+    if not await check_game(chat_id):
+        return
+    mafia = db.getData(
+        1, 'ID', f"!inGame = {chat_id} AND Alive = 1 AND `Role` = 2")
+    for Id in mafia:
+        await send_mafia_actions(Id, chat_id)
+    doctor = db.getData(
+        1, 'ID', f"!inGame = {chat_id} AND Alive = 1 AND `Role` = 3")
+    for Id in doctor:
+        await send_doctor_actions(Id, chat_id)
+    sherif = db.getData(
+        1, 'ID', f"!inGame = {chat_id} AND Alive = 1 AND `Role` = 3")
+    for Id in sherif:
+        await send_sherif_actions(Id, chat_id)
     db.writeData(3, 'Night', (await get_game_data(chat_id))['night'] + 1, f"!ChatID = {chat_id}")
     await asyncio.sleep(PHASE_TIMEOUTS['night'])
+    if not await check_game(chat_id):
+        return
 
     game_data = await get_game_data(chat_id)
     killed = game_data['actions']['killed']
@@ -286,16 +344,21 @@ async def night_phase(chat_id):
 
 
 async def day_phase(chat_id):
-    alive_players = db.getData(1, 'ID', f"!inGame = {chat_id} AND Alive = 1")
+    if not await check_game(chat_id):
+        return
+    alive_players = db.getData(
+        1, '(`ID`, `Nickname`)', f"!inGame = {chat_id} AND Alive = 1")
     markup = InlineKeyboardMarkup()
-    for player in alive_players:
+    for ID, Nickname in alive_players:
         markup.add(InlineKeyboardButton(
-            f"👤 {db.getData(1, 'Nickname', player)[0]}",
-            callback_data=f"vote_{player}"
+            f"👤 {Nickname}",
+            callback_data=f"vote_{ID}"
         ))
 
     await send_to_group(chat_id, "🗳️ Начинаем дневное голосование! Выберите игрока для исключения:", reply_markup=markup)
     await asyncio.sleep(PHASE_TIMEOUTS['day'])
+    if not await check_game(chat_id):
+        return
 
     votes = {}
     messages = await bot.get_chat(chat_id).get_messages()
@@ -338,6 +401,16 @@ async def process_heal(callback: CallbackQuery):
     await callback.answer("✅ Пациент выбран!")
 
 
+@dp.callback_query_handler(lambda c: c.data.startswith('check_'))
+async def process_heal(callback: CallbackQuery):
+    checked_id = int(callback.data.split('_')[1])
+    chat_id = db.getData(1, 'inGame', callback.from_user.id)[0]
+    Role = db.getData(2, 'Title', db.getData(1, 'Role', checked_id))
+
+    await bot.send_message(chat_id, f"Роль этого игрока: {Role}")
+    db.writeData(1, 'Checked', 1, checked_id)
+
+
 async def check_win_condition(chat_id):
     mafia = db.getData(
         1, 'ID', f"!inGame = {chat_id} AND Alive = 1 AND role = 2")
@@ -355,9 +428,9 @@ async def check_win_condition(chat_id):
 
 
 async def end_game(chat_id):
-    db.writeData(3, 'Night, AtNight',
-                 (1, '{"killed":-1,"healed":-1}'), f"!ChatID = {chat_id}")
-    db.writeData(1, 'inGame, Alive, role', (-1, 0, -1), f"!inGame = {chat_id}")
+    db.writeData(1, 'inGame, Alive, role, Checked',
+                    (-1, 1, -1, 0), f'!`inGame = {chat_id}`')
+    db.DeleteData(3, f'!ChatID = {chat_id}')
 
 if __name__ == '__main__':
     executor.start_polling(dp, skip_updates=True)

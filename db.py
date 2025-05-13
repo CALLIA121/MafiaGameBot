@@ -103,7 +103,7 @@ def writeData(DB: int,
         if result is None:
             if debug:
                 print(
-                    f'INSERT INTO `{DBlist[DB]}` ({st}, ) VALUES {value}')
+                    f'INSERT INTO `{DBlist[DB]}` {st} VALUES {value}')
             cursor.execute(
                 f'INSERT INTO `{DBlist[DB]}` ({st}) VALUES {value}')
         else:
@@ -111,14 +111,14 @@ def writeData(DB: int,
                 f'''UPDATE `{DBlist[DB]}` SET ({st}) = ({value}) WHERE `ID` = {qvest}''')
     else:
         qvest = qvest[1:]
-        cursor.execute(f'''SELECT `{st}` FROM `{DBlist[DB]}` WHERE {qvest}''')
+        cursor.execute(f'''SELECT {st} FROM `{DBlist[DB]}` WHERE {qvest}''')
         result = cursor.fetchone()
         if result is None:
             cursor.execute(
-                f'INSERT INTO `{DBlist[DB]}` ({st}) VALUES {value}')
+                f'INSERT INTO `{DBlist[DB]}` {st} VALUES {value}')
         else:
             cursor.execute(
-                f'''UPDATE `{DBlist[DB]}` SET `{st}` = {value} WHERE {qvest}''')
+                f'''UPDATE `{DBlist[DB]}` SET ({st}) = ({value})     WHERE {qvest}''')
     connect.commit()
 
 

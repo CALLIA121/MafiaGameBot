@@ -35,7 +35,7 @@ def banner(text: str) -> str:
     return outStr
 
 
-def fprint(*pr, sep="", end="\n", type="STD", ret=False):
+def fprint(*pr_raw, sep="", end="\n", type="STD", ret=False):
     '''
     :param pr: Несколько объектов для печати, будут склеяны через sep
     :param sep: Разделитель между объектами
@@ -44,6 +44,8 @@ def fprint(*pr, sep="", end="\n", type="STD", ret=False):
     ФОРМАТ: T1 - Жирный, T2 - Подчеркнутый, T3 - Курсив, T4 - Зачеркнутый BANER - банер (Только английский)
     :param ret: При False - сразу печатает, при True возвращает кастомизированый текст
     '''
+    pr = map(str, pr_raw)
+
     text = sep.join(pr) + end
     Colors = colorama.Fore
     Style = colorama.Style
