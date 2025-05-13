@@ -374,5 +374,6 @@ async def end_game(chat_id):
 
 
 if __name__ == '__main__':
-    executor.start_polling(dp, skip_updates=True)
     DeleteData(3)
+    executor.start_polling(dp, skip_updates=True)
+
