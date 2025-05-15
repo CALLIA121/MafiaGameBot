@@ -483,4 +483,6 @@ async def process_check(callback: CallbackQuery):
     await callback.message.edit_text(f"Роль игрока: {role_name}")
 
 if __name__ == '__main__':
+    fprint('Mafia bot', type='BANER C1 T1')
+    fprint('By CALLIA \n          & \n            Lolrerty', type=' C5 T1')
     executor.start_polling(dp, skip_updates=True)
