@@ -1,7 +1,7 @@
 import colorama
 import json
 # --------------------------- Настройки ---------------------------
-TOKEN = '7547376848:AAHa9ThwqibdqRiJoUj6oda6SxxEkwxoPcM'
+TOKEN = '8019616673:AAEUiUum3oh0GRmqaVXEvxRmqQwxouAMXAw'
 debug = True
 MAX_PLAYERS = 10
 MIN_PLAYERS = 4

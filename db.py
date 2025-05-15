@@ -3,8 +3,7 @@ import os
 
 from config import fprint, debug
 
-DBlist = {1: 'Users', 2: 'ChildsData',
-          3: 'TeacherData', 4: 'ParentData', 5: 'Data'}
+DBlist = {1: 'Users', 2:'Roles', 3:'Games'}
 
 
 def log(*t: str):
@@ -54,7 +53,7 @@ def DeleteData(DB: int,
                ) -> None:
     '''
     Удаление данных из базы.
-    :param DB: {1: 'Users', 2: 'ChildsData', 3: 'TeacherData', 4: 'ParentData', 5:'Data'}.
+    :param DB: {1: 'Users', 2:'Roles', 3:'Games'}
     :param qvest: условия для удаления, при передаче числа будет распознано как id, иначе пишите !<Sq3 условие>.
     '''
     global connect
@@ -90,7 +89,7 @@ def writeData(DB: int,
     '''
     Запись данных в базу.
     :param st: столбцы для записи.
-    :param DB: {1: 'Users', 2: 'ChildsData', 3: 'TeacherData', 4: 'ParentData', 5:'Data'}.
+    :param DB: {1: 'Users', 2:'Roles', 3:'Games'}.
     :param qvest: условия для записи, при передаче числа будет распознано как id, иначе пишите !<Sq3 условие>.
     :param value: данные для записи.
     '''
@@ -110,7 +109,7 @@ def writeData(DB: int,
                 log('Transform', valueR, '->', value)
             elif isinstance(value[0], str):
                 valueR = value
-                value = f"""("{'"), ("'.join((map(str, value)))}")"""
+                value = f"""('{ "'), ('".join((map(str, value)))}')"""
 
                 log('Transform', valueR, '->', value)
             else:
@@ -122,7 +121,7 @@ def writeData(DB: int,
             pass
         else:
             log('Transform', value, '->', f"""("{value}")""")
-            value = f"""("{value}")"""
+            value = f"""('{value}')"""
 
         if qvest is None:
             log(f'\n INSERT INTO {DBlist[DB]} {st} VALUES {value}')
@@ -159,7 +158,7 @@ def getData(DB: int,
             All=False) -> list:
     '''
     :param st: столбец для чтения.
-    :param DB: {1: 'Users', 2: 'ChildsData', 3: 'TeacherData', 4: 'ParentData', 5:'Data'}.
+    :param DB: {1: 'Users', 2:'Roles', 3:'Games'}.
     :param qvest: условия для чтения, при передаче числа будет распознано как id, иначе пишите !<Sq3 условие>.
     :param All: Выбрать все, или только одну запись
     '''
