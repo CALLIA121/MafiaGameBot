@@ -9,6 +9,7 @@ from aiogram.utils import executor
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 import db
 from config import fprint, MAX_PLAYERS
+from db import *
 
 # ------------------------ Инициализация бота -----------------------
 API_TOKEN = '7547376848:AAHa9ThwqibdqRiJoUj6oda6SxxEkwxoPcM'
@@ -17,6 +18,7 @@ storage = MemoryStorage()
 dp = Dispatcher(bot, storage=storage)
 
 db.connectTo('bot.db')
+
 
 # ------------------------ Состояния регистрации --------------------
 
@@ -28,10 +30,14 @@ class Registration(StatesGroup):
 # ------------------------ Константы и утилиты -----------------------
 PHASE_TIMEOUTS = {'night': 60, 'day': 120}
 ROLES = {
-    1: {'title': 'Мирный житель', 'emoji': '👨🌾', 'color': '#27ae60', 'about': 'Ваша цель - выжить и выявить всех членов мафии путем голосования.'},
-    2: {'title': 'Мафия', 'emoji': '🔫', 'color': '#c0392b', 'about': 'Ночью вы устраняете мирных жителей, днем стараетесь не попасться.'},
-    3: {'title': 'Доктор', 'emoji': '🩺', 'color': '#2980b9', 'about': 'Каждую ночь вы можете выбрать одного игрока для лечения.'},
-    4: {'title': 'Комиссар', 'emoji': '🕵️', 'color': '#8e44ad', 'about': 'Ночью вы можете проверить роль одного игрока.'}
+    1: {'title': 'Мирный житель', 'emoji': '👨🌾', 'color': '#27ae60',
+        'about': 'Ваша цель - выжить и выявить всех членов мафии путем голосования.'},
+    2: {'title': 'Мафия', 'emoji': '🔫', 'color': '#c0392b',
+        'about': 'Ночью вы устраняете мирных жителей, днем стараетесь не попасться.'},
+    3: {'title': 'Доктор', 'emoji': '🩺', 'color': '#2980b9',
+        'about': 'Каждую ночь вы можете выбрать одного игрока для лечения.'},
+    4: {'title': 'Комиссар', 'emoji': '🕵️', 'color': '#8e44ad',
+        'about': 'Ночью вы можете проверить роль одного игрока.'}
 }
 
 
@@ -51,6 +57,7 @@ async def get_game_data(chat_id):
 async def update_game_data(chat_id, data):
     db.writeData(3, 'AtNight', json.dumps(data), f"!ChatID = {chat_id}")
 
+
 # ------------------------ Обработчики команд ------------------------
 
 
@@ -69,7 +76,8 @@ async def cmd_start_private(message: types.Message):
 async def cmd_start_group(message: types.Message):
     user_id = message.from_user.id
     if not db.getData(1, 'ID', user_id):
-        await message.reply("⚠️ Для участия в игре нужно зарегистрироваться!\nПерейдите в личные сообщения с ботом и напишите /start")
+        await message.reply(
+            "⚠️ Для участия в игре нужно зарегистрироваться!\nПерейдите в личные сообщения с ботом и напишите /start")
 
 
 @dp.message_handler(state=Registration.nickname)
@@ -116,9 +124,9 @@ async def cmd_start_game(message: types.Message):
 
     markup = InlineKeyboardMarkup(row_width=2)
     markup.add(
-        InlineKeyboardButton("🎮 Присоединиться",
-                             callback_data=f"join_{chat_id}"),
-        InlineKeyboardButton("🚀 Начать игру", callback_data=f"start_{chat_id}")
+        InlineKeyboardButton("🎮 Присоединиться", callback_data=f"join_{chat_id}"),
+        InlineKeyboardButton("🚀 Начать игру", callback_data=f"start_{chat_id}"),
+        InlineKeyboardButton("❌ Завершить игру", callback_data=f"end_{chat_id}")
     )
 
     players = db.getData(1, 'Nickname', f"!inGame = {chat_id} AND Alive = 1")
@@ -133,7 +141,8 @@ async def cmd_start_game(message: types.Message):
         reply_markup=markup
     )
 
-    db.writeData(3, 'MessageID', msg.message_id, f"!ChatID = {chat_id}")    
+    db.writeData(3, 'MessageID', msg.message_id, f"!ChatID = {chat_id}")
+
 
 # ------------------------ Callback обработчики ----------------------
 
@@ -157,13 +166,12 @@ async def process_join(callback: CallbackQuery):
         await callback.answer("❌ Вы уже в другой игре!")
         return
 
-    
-    
     db.writeData(1, 'inGame, Alive, role',
-                    (chat_id, 1, -1), user_id)
+                 (chat_id, 1, -1), user_id)
 
     await callback.answer("✅ Вы успешно присоединились!")
     await update_game_lobby(chat_id)
+
 
 async def update_game_lobby(chat_id):
     players = db.getData(1, 'Nickname', f"!inGame = {chat_id} AND Alive = 1")
@@ -178,14 +186,15 @@ async def update_game_lobby(chat_id):
     )
 
     await bot.edit_message_text(
-        text = f"🎉 Начинаем новую игру в Мафию!\n"
-        f"👥 Игроков: {len(players)}/{MAX_PLAYERS}\n" 
-        f"➖➖➖➖➖➖➖➖➖➖\n"
-        f"Участники:\n{players_list}",
+        text=f"🎉 Начинаем новую игру в Мафию!\n"
+             f"👥 Игроков: {len(players)}/{MAX_PLAYERS}\n"
+             f"➖➖➖➖➖➖➖➖➖➖\n"
+             f"Участники:\n{players_list}",
         reply_markup=markup,
         chat_id=chat_id,
         message_id=msg
     )
+
 
 @dp.callback_query_handler(lambda c: c.data.startswith('start_'))
 async def process_start(callback: CallbackQuery):
@@ -214,13 +223,14 @@ async def process_start(callback: CallbackQuery):
 
     await start_game_logic(chat_id)
 
+
 # ------------------------ Игровая логика ----------------------------
 
 
 async def start_game_logic(chat_id):
     players = db.getData(1, 'ID', f"!inGame = {chat_id} AND Alive = 1")
 
-    roles = [2] + [3, 4] + [1]*(len(players)-3)
+    roles = [2] + [3, 4] + [1] * (len(players) - 3)
     random.shuffle(roles)
 
     for i, player_id in enumerate(players):
@@ -278,7 +288,8 @@ async def night_phase(chat_id):
 
     if healed != killed and killed != -1:
         db.writeData(1, 'Alive', 0, f"!ID = {killed}")
-        await send_to_group(chat_id, f"☀️ Утро! Было совершено убийство! Жертва: {db.getData(1, 'Nickname', killed)[0]}")
+        await send_to_group(chat_id,
+                            f"☀️ Утро! Было совершено убийство! Жертва: {db.getData(1, 'Nickname', killed)[0]}")
     else:
         await send_to_group(chat_id, "☀️ Утро! Прошла спокойная ночь без происшествий!")
 
@@ -294,7 +305,8 @@ async def day_phase(chat_id):
             callback_data=f"vote_{player}"
         ))
 
-    await send_to_group(chat_id, "🗳️ Начинаем дневное голосование! Выберите игрока для исключения:", reply_markup=markup)
+    await send_to_group(chat_id, "🗳️ Начинаем дневное голосование! Выберите игрока для исключения:",
+                        reply_markup=markup)
     await asyncio.sleep(PHASE_TIMEOUTS['day'])
 
     votes = {}
@@ -355,9 +367,13 @@ async def check_win_condition(chat_id):
 
 
 async def end_game(chat_id):
-    db.writeData(3, 'Night, AtNight',
-                 (1, '{"killed":-1,"healed":-1}'), f"!ChatID = {chat_id}")
+    db.writeData(3, 'Night, AtNight, MessageID',
+                 (1, '{"killed":-1,"healed":-1}', -1), f"!ChatID = {chat_id}")
     db.writeData(1, 'inGame, Alive, role', (-1, 0, -1), f"!inGame = {chat_id}")
+    await send_to_group(chat_id, "🏁 Игра была завершена создателем. До новых встреч!")
+
 
 if __name__ == '__main__':
+    DeleteData(3)
     executor.start_polling(dp, skip_updates=True)
+

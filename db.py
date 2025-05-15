@@ -5,7 +5,6 @@ from config import fprint, debug
 
 DBlist = {1: 'Users', 2: 'Rols', 3: 'Games'}
 
-
 def connectTo(file_path: str) -> bool:
     """
     Подключается к базе данных.
@@ -191,3 +190,41 @@ def getAll(DB):
     cursor.execute(f'''SELECT * FROM `{DBlist[DB]}`''')
     result = cursor.fetchall()
     return result
+
+
+def DeleteData(DB: int,
+               qvest=None
+               ) -> None:
+    '''
+    Удаление данных из базы.
+    :param DB: {1: 'Users', 2: 'Rols', 3: 'Games'}.
+    :param qvest: условия для удаления, при передаче числа будет распознано как id, иначе пишите !<Sq3 условие>.
+    '''
+    global connect
+    global cursor
+    global debug
+
+    if qvest is None:
+        if debug:
+            print(f'DELETE FROM {DBlist[DB]}')
+        cursor.execute(f'DELETE FROM {DBlist[DB]}')
+        connect.commit()
+        return None
+
+    isID = True
+    if isinstance(qvest, str):
+        if qvest[0] == "!":
+            isID = False
+
+    if isID:
+        qvest = int(qvest)
+        if debug:
+            print(f'DELETE FROM {DBlist[DB]} WHERE ID = {qvest}')
+        cursor.execute(f'DELETE FROM {DBlist[DB]} WHERE ID = {qvest}')
+    else:
+        qvest = qvest[1:]
+        if debug:
+            print(f'DELETE FROM {DBlist[DB]} WHERE {qvest}')
+        cursor.execute(f'DELETE FROM {DBlist[DB]} WHERE {qvest}')
+
+    connect.commit()
