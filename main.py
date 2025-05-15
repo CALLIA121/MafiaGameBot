@@ -139,11 +139,6 @@ async def cmd_start_game(message: types.Message):
     db.writeData(3, 'MessageID', msg.message_id, f"!ChatID = {chat_id}")
 
 
-@dp.message_handler(commands=['test'])
-async def test_game(message: types.Message):
-    await day_phase(message.chat.id)
-
-
 @dp.message_handler(commands=['endgame'])
 async def cmd_end_game(message: types.Message):
     chat_id = message.chat.id
@@ -336,9 +331,9 @@ async def night_phase(chat_id):
     if sherifs:
         await send_sherif_actions(sherifs, chat_id)
 
-    print('------------------------------------------- Запуск таймера')
+    fprint('------------------------------------------- Запуск таймера', type='T1 C5')
     await asyncio.sleep(PHASE_TIMEOUTS['night'])
-    print('------------------------------------------- Окончание таймера')
+    fprint('------------------------------------------- Окончание таймера', type='T1 C5')
 
     game_data = await get_game_data(chat_id)
     killed = game_data['actions']['killed']

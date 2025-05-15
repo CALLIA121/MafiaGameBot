@@ -3,7 +3,7 @@ import os
 
 from config import fprint, debug
 
-DBlist = {1: 'Users', 2:'Roles', 3:'Games'}
+DBlist = {1: 'Users', 2: 'Roles', 3: 'Games'}
 
 
 def log(*t: str):
