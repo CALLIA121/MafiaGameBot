@@ -3,7 +3,31 @@ import os
 
 from config import fprint, debug
 
-DBlist = {1: 'Users', 2: 'Rols', 3: 'Games'}
+DBlist = {1: 'Users', 2: 'ChildsData',
+          3: 'TeacherData', 4: 'ParentData', 5: 'Data'}
+
+
+def log(*t: str):
+    if debug:
+        text = ''
+        for word in t:
+            word = str(word)
+            text = f'{text} {word}'
+
+        fprint('LOG:', type='C6', end='')
+        fprint(text)
+
+
+def succes(*t: str):
+    if debug:
+        text = ''
+        for word in t:
+            word = str(word)
+            text = f'{text} {word}'
+
+        fprint('SUCCES: ', type='C3', end='')
+        fprint(text)
+
 
 def connectTo(file_path: str) -> bool:
     """
@@ -24,189 +48,20 @@ def connectTo(file_path: str) -> bool:
     except Exception:
         return False
 
-def DeleteData(DB: int,
-              qvest=None
-              ) -> None:
-    '''
-    Удаление данных из базы.
-    :param DB: {1: 'Users', 2: 'Rols', 3: 'Games'}.
-    :param qvest: условия для удаления, при передаче числа будет распознано как id, иначе пишите !<Sq3 условие>.
-    '''
-    global connect
-    global cursor
-    global debug
-
-    if qvest is None:
-        if debug:
-            print(f'DELETE FROM {DBlist[DB]}')
-        cursor.execute(f'DELETE FROM {DBlist[DB]}')
-        connect.commit()
-        return None
-
-    isID = True
-    if isinstance(qvest, str):
-        if qvest[0] == "!":
-            isID = False
-
-    if isID:
-        qvest = int(qvest)
-        if debug:
-            print(f'DELETE FROM {DBlist[DB]} WHERE ID = {qvest}')
-        cursor.execute(f'DELETE FROM {DBlist[DB]} WHERE ID = {qvest}')
-    else:
-        qvest = qvest[1:]
-        if debug:
-            print(f'DELETE FROM {DBlist[DB]} WHERE {qvest}')
-        cursor.execute(f'DELETE FROM {DBlist[DB]} WHERE {qvest}')
-    
-    connect.commit()
-
-
-def writeData(DB: int,
-              st: str,
-              value,
-              qvest=None
-              ) -> None:
-    '''
-    Запись данных в базу.
-    :param st: столбец для записи.
-    :param DB: {1: 'Users', 2: 'Rols', 3: 'Games'}.
-    :param qvest: условия для записи, при передаче числа будет распознано как id, иначе пишите !<Sq3 условие>.
-    :param value: данные для записи.
-    '''
-    global connect
-    global cursor
-    global debug
-
-    if qvest is None:
-        if debug:
-            print(f'INSERT INTO {DBlist[DB]} ({st}) VALUES {value}')
-        cursor.execute(
-            f'INSERT INTO {DBlist[DB]} ({st}) VALUES {value}')
-        connect.commit()
-        return None
-
-    isID = True
-    if isinstance(qvest, str):
-        if qvest[0] == "!":
-            isID = False
-
-    if isID:
-        qvest = int(qvest)
-        cursor.execute(
-            f'''SELECT ID FROM `{DBlist[DB]}` WHERE `ID` = {qvest}''')
-        result = cursor.fetchone()
-        if debug:
-            print(
-                f'''SELECT ID FROM `{DBlist[DB]}` WHERE `ID` = {qvest} ->''', result)
-        if result is None:
-            if debug:
-                print(
-                    f'INSERT INTO `{DBlist[DB]}` ({st}, ) VALUES {value}')
-            cursor.execute(
-                f'INSERT INTO `{DBlist[DB]}` ({st}) VALUES {value}')
-        else:
-            cursor.execute(
-                f'''UPDATE `{DBlist[DB]}` SET ({st}) = ({value}) WHERE `ID` = {qvest}''')
-    else:
-        qvest = qvest[1:]
-        cursor.execute(f'''SELECT `{st}` FROM `{DBlist[DB]}` WHERE {qvest}''')
-        result = cursor.fetchone()
-        if result is None:
-            cursor.execute(
-                f'INSERT INTO `{DBlist[DB]}` ({st}) VALUES {value}')
-        else:
-            cursor.execute(
-                f'''UPDATE `{DBlist[DB]}` SET `{st}` = {value} WHERE {qvest}''')
-    connect.commit()
-
-
-def getData(DB: int,
-            st: str,
-            qvest="!1 = 1") -> list:
-    '''
-    :param st: столбец для чтения.
-    :param DB: {1: 'Users', 2: 'Rols', 3: 'Games'}.
-    :param qvest: условия для чтения, при передаче числа будет распознано как id, иначе пишите !<Sq3 условие>.
-    '''
-    global connect
-    global cursor
-    global debug
-
-    DB = DBlist[DB]
-
-    isID = True
-    if isinstance(qvest, str):
-        if qvest[0] == "!":
-            isID = False
-
-    if isID:
-        qvest = int(qvest)
-        if debug:
-            print(f'''SELECT {st} FROM `{DB}` WHERE `ID` = {qvest}''')
-        cursor.execute(f'''SELECT {st} FROM `{DB}` WHERE `ID` = {qvest}''')
-        result = cursor.fetchall()
-        if result is None:
-            return []
-        else:
-            buff = []
-            for line in result:
-                if ',' in st or '*' in st:
-                    buff.append(tuple(line))
-                else:
-                    buff.append(line[0])
-
-            return buff
-    else:
-        qvest = qvest[1:]
-        cursor.execute(f'''SELECT {st} FROM `{DB}` WHERE {qvest}''')
-        result = cursor.fetchall()
-        if result is None:
-            return []
-        else:
-            buff = []
-            for line in result:
-                if ',' in st or '*' in st:
-                    buff.append(tuple(line))
-                else:
-                    buff.append(line[0])
-
-            return buff
-
-
-def check(TGID):
-    cursor.execute(f'''SELECT * FROM `{DBlist[1]}` WHERE `ID` = {TGID}''')
-    result = cursor.fetchone()
-    return False if result is None else True
-
-
-def getTabls(DB):
-    cursor.execute(f'''SELECT * FROM `{DBlist[DB]}`''')
-    result = cursor.fetchone()
-    return cursor.description
-
-
-def getAll(DB):
-    cursor.execute(f'''SELECT * FROM `{DBlist[DB]}`''')
-    result = cursor.fetchall()
-    return result
-
 
 def DeleteData(DB: int,
                qvest=None
                ) -> None:
     '''
     Удаление данных из базы.
-    :param DB: {1: 'Users', 2: 'Rols', 3: 'Games'}.
+    :param DB: {1: 'Users', 2: 'ChildsData', 3: 'TeacherData', 4: 'ParentData', 5:'Data'}.
     :param qvest: условия для удаления, при передаче числа будет распознано как id, иначе пишите !<Sq3 условие>.
     '''
     global connect
     global cursor
-    global debug
 
     if qvest is None:
-        if debug:
-            print(f'DELETE FROM {DBlist[DB]}')
+        log(f'DELETE FROM {DBlist[DB]}')
         cursor.execute(f'DELETE FROM {DBlist[DB]}')
         connect.commit()
         return None
@@ -217,14 +72,155 @@ def DeleteData(DB: int,
             isID = False
 
     if isID:
-        qvest = int(qvest)
-        if debug:
-            print(f'DELETE FROM {DBlist[DB]} WHERE ID = {qvest}')
-        cursor.execute(f'DELETE FROM {DBlist[DB]} WHERE ID = {qvest}')
+        qvest = f'ID = {qvest}'
     else:
         qvest = qvest[1:]
-        if debug:
-            print(f'DELETE FROM {DBlist[DB]} WHERE {qvest}')
-        cursor.execute(f'DELETE FROM {DBlist[DB]} WHERE {qvest}')
 
+    log(f'DELETE FROM {DBlist[DB]} WHERE {qvest}')
+    cursor.execute(f'DELETE FROM {DBlist[DB]} WHERE {qvest}')
     connect.commit()
+    succes()
+
+
+def writeData(DB: int,
+              st: tuple,
+              value: tuple,
+              qvest=None
+              ) -> None:
+    '''
+    Запись данных в базу.
+    :param st: столбцы для записи.
+    :param DB: {1: 'Users', 2: 'ChildsData', 3: 'TeacherData', 4: 'ParentData', 5:'Data'}.
+    :param qvest: условия для записи, при передаче числа будет распознано как id, иначе пишите !<Sq3 условие>.
+    :param value: данные для записи.
+    '''
+    global connect
+    global cursor
+    try:
+
+        if isinstance(st, str):
+            log('Transform', st, '->', '(`' + st + '`)')
+            st = '(`' + st + '`)'
+
+        if isinstance(value, list):
+            if isinstance(value[0], tuple):
+                valueR = value
+                value = f"{', '.join((map(str, value)))}"
+
+                log('Transform', valueR, '->', value)
+            elif isinstance(value[0], str):
+                valueR = value
+                value = f"""("{'"), ("'.join((map(str, value)))}")"""
+
+                log('Transform', valueR, '->', value)
+            else:
+                valueR = value
+                value = f"""({'), ('.join((map(str, value)))})"""
+
+                log('Transform', valueR, '->', value)
+        elif isinstance(value, tuple):
+            pass
+        else:
+            log('Transform', value, '->', f"""("{value}")""")
+            value = f"""("{value}")"""
+
+        if qvest is None:
+            log(f'\n INSERT INTO {DBlist[DB]} {st} VALUES {value}')
+            cursor.execute(
+                f'INSERT INTO {DBlist[DB]} {st} VALUES {value}')
+            connect.commit()
+            fprint('SUCCES', type='C3')
+            return
+
+        isID = True
+        if isinstance(qvest, str):
+            if qvest[0] == "!":
+                isID = False
+
+        if isID:
+            qvest = f'`ID` = "{qvest}"'
+        else:
+            qvest = qvest[1:]
+
+        log(f'\n UPDATE `{DBlist[DB]}` SET {st} = {value} WHERE {qvest}')
+        cursor.execute(
+            f'''UPDATE `{DBlist[DB]}` SET {st} = {value} WHERE {qvest}''')
+        succes()
+
+        connect.commit()
+    except Exception as e:
+        fprint('ERROR INSERT: ', type='C1', end='')
+        fprint(e)
+
+
+def getData(DB: int,
+            st: str,
+            qvest="!1 = 1",
+            All=False) -> list:
+    '''
+    :param st: столбец для чтения.
+    :param DB: {1: 'Users', 2: 'ChildsData', 3: 'TeacherData', 4: 'ParentData', 5:'Data'}.
+    :param qvest: условия для чтения, при передаче числа будет распознано как id, иначе пишите !<Sq3 условие>.
+    :param All: Выбрать все, или только одну запись
+    '''
+    global connect
+    global cursor
+
+    DB = DBlist[DB]
+
+    try:
+
+        if isinstance(st, str):
+            log('Transform', st, '->', '(`' + st + '`)')
+            st = '(`' + st + '`)'
+        elif isinstance(st, tuple):
+            log('Transform', st, '->', ', '.join(st))
+            st = ', '.join(st)
+
+        isID = True
+        if isinstance(qvest, str):
+            if qvest[0] == "!":
+                isID = False
+
+        if isID:
+            qvest = f"`ID` = {qvest}"
+        else:
+            qvest = qvest[1:]
+
+        log(f'''SELECT {st} FROM `{DB}` WHERE {qvest}''')
+        cursor.execute(f'''SELECT {st} FROM `{DB}` WHERE {qvest}''')
+        result = cursor.fetchall()
+
+        if All:
+            if result is None:
+                ret = []
+            else:
+                buff = []
+                for line in result:
+                    if ',' in st or '*' in st:
+                        buff.append(tuple(line))
+                    else:
+                        buff.append(line[0])
+
+                ret = buff
+        else:
+            if result is None:
+                ret = None
+            else:
+                if ',' in st or '*' in st:
+                    ret = tuple(result[0])
+                else:
+                    ret = result[0][0]
+
+        succes(ret)
+        return ret
+
+    except Exception as e:
+        fprint('ERROR SELECT: ', type='C1', end='')
+        fprint(e)
+
+
+def check(TGID):
+    cursor.execute(f'''SELECT * FROM `{DBlist[1]}` WHERE `ID` = {TGID}''')
+    result = cursor.fetchone()
+    return False if result is None else True
