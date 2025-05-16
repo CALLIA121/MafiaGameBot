@@ -314,7 +314,7 @@ async def send_sherif_actions(user_id, chat_id):
 
 
 async def night_phase(chat_id):
-    await send_to_group(chat_id, "🌙 Ночь наступает! У игроков есть 2 минуты на действия!")
+    await send_to_group(chat_id, "🌙 Ночь наступает! У игроков есть 1 минута на действия!")
     mafia = db.getData(1, 'ID',
                        f"!inGame = {chat_id} AND Alive = 1 AND role = 2")
     if mafia:
